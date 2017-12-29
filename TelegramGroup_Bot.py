@@ -40,7 +40,7 @@ def message(update):
 		entities = []
 
 	if 'from' in update:
-		from_ = str(update['entities']).lower()
+		from_ = str(update['from']).lower()
 		from_ =  re.findall(r'(?:https?:\/\/)?(?:[\w\.]+)\.(?:[a-z]{2,6}\.?)(?:\/[\w\.]*)*\/?', from_ )
 	else:
 		from_ = []
@@ -56,7 +56,7 @@ def message(update):
 		if user != -1  : return 
 	
 	# Если ссылок в сообщении не найдено то пропускает
-	if len(text) + len(caption) + len(entities) + len(first_name) + len(from_) == 0 : return
+	if len(text) + len(caption) + len(entities) + len(from_) == 0 : return
 	
 	# Если есть реплей в сообщении
 	if 'reply_to_message' in update :		
