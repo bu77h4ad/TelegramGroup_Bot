@@ -20,8 +20,8 @@ def message(update):
 	#Проверка на исключения пользователя	
 	#replay_user =0
 	#user = 0 
-	#with open('TelegramGroup_Bot.log', 'a', encoding='utf8') as outfile:
-	#	json.dump(update, outfile, sort_keys = True, indent = 4 ,ensure_ascii=False)
+	with open('TelegramGroup_Bot.log', 'a', encoding='utf8') as outfile:
+		json.dump(update, outfile, sort_keys = True, indent = 4 ,ensure_ascii=False)
 	
 	if 'text' in update :
 		text = re.findall (r'(?:https?:\/\/)?(?:[\w\.]+)\.(?:[a-z]{2,6}\.?)(?:\/[\w\.]*)*\/?', update['text'].lower() )	
@@ -33,9 +33,21 @@ def message(update):
 	else:
 		caption = []
 
-	#pprint.pprint (update)	
-	#print ("SSILKI ", text, caption)
-	#print()	
+	if 'entities' in update:
+		entities = str(update['entities']).lower()
+		entities = re.findall(r'(?:https?:\/\/)?(?:[\w\.]+)\.(?:[a-z]{2,6}\.?)(?:\/[\w\.]*)*\/?', entities )	
+	else:
+		entities = []
+
+	if 'from' in update:
+		from_ = str(update['entities']).lower()
+		from_ =  re.findall(r'(?:https?:\/\/)?(?:[\w\.]+)\.(?:[a-z]{2,6}\.?)(?:\/[\w\.]*)*\/?', from_ )
+	else:
+		from_ = []
+
+	pprint.pprint (update)	
+	print ("SSILKI ", text, caption)
+	print()	
 	
 	
 	if 'username' in update['from'] :
@@ -44,7 +56,7 @@ def message(update):
 		if user != -1  : return 
 	
 	# Если ссылок в сообщении не найдено то пропускает
-	if len(text) + len(caption) == 0 : return
+	if len(text) + len(caption) + len(entities) + len(first_name) + len(from_) == 0 : return
 	
 	# Если есть реплей в сообщении
 	if 'reply_to_message' in update :		
