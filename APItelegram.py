@@ -1,88 +1,101 @@
-import requests
-import pprint
+# -*- coding: utf-8 -*-
+import re
 import json
-import sys
+import time
+import pprint
+import requests
+import APItelegram
+from configparser import ConfigParser
 
-class telegram():
-	"""
-	Class for API Telegram
-	"""
-	def __init__(self, token):
-		self.token = token
-		self.url = 'https://api.telegram.org/bot' + self.token + '/'
+cfg = ConfigParser()
+cfg.read('TelegramGroup_Bot.ini')
+
+uset_exception = cfg.get('Telegram', 'User_exception')
+token = cfg.get('Telegram', 'Token_bot')
+
+bot = APItelegram.telegram(token)
+regul = '(?:https?:\/\/)?(?:[\w\.]+)\.(?:[a-z]{2,6}\.?)(?:\/[\w\.]*)*\/?'
+
+def message(update):
+	###Запрет ССЫЛОК
+	#Проверка на исключения пользователя	
+	#replay_user =0
+	#user = 0 
+	#with open('TelegramGroup_Bot.log', 'a', encoding='utf8') as outfile:
+	#	json.dump(update, outfile, sort_keys = True, indent = 4 ,ensure_ascii=False)
 	
-	def getMe(self):
-		try: 
-			return requests.post(self.url + 'getMe').json()
-		except:
-			print ("Error: ", sys.exc_info()[1])
-			return False 		
-
-	def getUpdates(self, offset = 0):  	
-		params = { 'offset': offset }
-		try:
-			return  requests.post (self.url  + 'getUpdates', params  ).json()
-		except:
-		 	print ("Error: ", sys.exc_info()[1])
-		 	return False
-		 
-
-	def delUpdates(self):
-		"""
-		Удаляет все обновления на сервере
-		"""
-		update = telegram.getUpdates(self)
-		if update == False or len(update['result']) == 0: return True
-		update_id = update['result'][-1]['update_id']
-		telegram.getUpdates(self, offset = update_id + 1)
-		return  True
-
-	def getMessage(self,offset = 0):
-		"""
-		Возвращает 1ое ПМ найденное сообщение в хронологическом порядке, все другие записи стирает до 1ого сообщения
-		"""
-		# получаем список обновлений
-		telegram_update = telegram.getUpdates(self, offset)
-
-		if telegram_update == False : return False
-		telegram_update = telegram_update['result'] 
-		# проходимся по всему списку в хронологическом порядке, пока не найдем певое сообщение
-		for x in range(0,len(telegram_update)):
-						
-			if 'message' in telegram_update[x] and 'text' in  telegram_update[x]['message']	:
-				telegram.getUpdates(self, offset = int(telegram_update[0]['update_id']) + 1 + x )
-				return telegram_update[x]['message']
-		#Если сообщения не найдены, но возможно в апдейте что то хранится, то удаляем
-		else: 
-			if len(telegram_update) == 0: return False
-			telegram.getUpdates(self, offset = int(telegram_update[0]['update_id']) + 1 + x )
-		# Если записей нет
-		return False		
+	if 'text' in update :
+		text = re.findall (regul, update['text'].lower() )	
+	else:
+		text = []
 	
-	def sendMessage(self, chat_id, text = 'Привет'):
-		"""
-		Отправляет сообщение
-		"""
-		params = {'chat_id': chat_id, 'text': text}
-		method = 'sendMessage'
-		try:
-			return requests.post(self.url + method, params).json()
-		except:
-			print ("Error: ", sys.exc_info()[1])
-			return False 
+	if 'caption' in update : 
+		caption =  re.findall(regul, update['caption'].lower() )	
+	else:
+		caption = []
 
-	def deletemessage(self, chat_id, message_id):
-		"""
-		Удаляет сообщения
-		"""
-		params = {'chat_id': chat_id, 'message_id': message_id}
-		method = 'deletemessage'
-		return requests.post(self.url + method, params)
+	if 'entities' in update:
+		entities = str(update['entities']).lower()
+		entities = re.findall(regul, entities )	
+	else:
+		entities = []
 
-	def getChannelPost(self):
-		pass
-		
-#for x in range(0,0):
-#	print ("telo")
-#else:
-#	print ("else")
+	if 'from' in update:
+		from_ = str(update['from']).lower()
+		from_ =  re.findall(regul, from_ )
+	else:
+		from_ = []
+
+	#pprint.pprint (update)	
+	#print ("SSILKI ", text, caption)
+	#print()	
+	
+	
+	if 'username' in update['from'] :
+		user = uset_exception.lower().find(update['from']['username'].lower()) 
+		# Если пользователь отправивший сообщение в исключениях то пропускает
+		if user != -1  : return 
+	
+	# Если ссылок в сообщении не найдено то пропускает
+	if len(text) + len(caption) + len(entities) + len(from_) == 0 : return
+	
+	# Если есть реплей в сообщении
+	if 'reply_to_message' in update :		
+		if 'username' in update['reply_to_message']['from'] : 
+			replay_user = uset_exception.lower().find(update['reply_to_message']['from']['username'].lower())	
+			# Если реплеят сообщения, юзера из исключений то пропускает 
+			if replay_user != -1 : return
+	
+	if  len(re.findall(regul, update['from']['first_name'] )) == 0: 
+		name = update['from']['first_name'] 
+	else: 
+		name = 'Ссылочник'
+	print ("[ЗАБЛОКИРОВАНО] ->", update['from']['first_name'], text , caption )
+	bot.deletemessage(update['chat']['id'], update['message_id'])
+	bot.sendMessage(update['chat']['id'], name + ", размещение ссылок в данном чате запрещено!" )
+
+def channel_post(update):	
+	pass
+
+pprint.pprint (bot.getMe())	
+print ('\n', "TelegramGroup_Bot Запущен ... ")
+
+update_id = 0
+bot.delUpdates()
+
+while True :
+	
+	try:		
+		update = bot.getUpdates(update_id + 1)['result']
+	except:
+		print ('update_id', update_id)
+		pprint.pprint (update)
+		continue
+
+	for x in range(0,len(update)):
+		#if 'channel_post' in update[x] : channel_post(update[x]['channel_post']) ; update_id = update[x]['update_id']	
+		if 'message' in update[x] : message(update[x]['message']) ; update_id = update[x]['update_id']
+	
+
+
+
